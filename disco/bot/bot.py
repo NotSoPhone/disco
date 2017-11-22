@@ -326,12 +326,14 @@ class Bot(LoggingClass):
             for prefix in prefixes:
                 if content.startswith(prefix):
                     content = content[len(prefix):]
+                    content = content.lstrip()
                     break
         else:
             if prefix and not content.startswith(prefix):
                 return []
             else:
                 content = content[len(prefix):]
+                content = content.lstrip()
 
         if not self.command_matches_re or not self.command_matches_re.match(content):
             return []
