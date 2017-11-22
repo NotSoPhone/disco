@@ -322,14 +322,15 @@ class Bot(LoggingClass):
             content = content.lstrip()
 
         prefixes.sort(key=len)
-        if prefixes and any(content.startswith(p) for p in prefixes):
+        prefixes = [p.lower() for p in prefixes]
+        if prefixes and any(content.lower().startswith(p) for p in prefixes):
             for prefix in prefixes:
-                if content.startswith(prefix):
+                if content.lower().startswith(prefix):
                     content = content[len(prefix):]
                     content = content.lstrip()
                     break
         else:
-            if prefix and not content.startswith(prefix):
+            if prefix and not content.lower().startswith(prefix):
                 return []
             else:
                 content = content[len(prefix):]
