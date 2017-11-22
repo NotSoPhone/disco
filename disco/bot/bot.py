@@ -82,7 +82,6 @@ class BotConfig(Config):
 
     commands_enabled = True
     commands_require_mention = True
-    commands_can_mention = True
     commands_mention_rules = {
         # 'here': False,
         'everyone': False,
@@ -268,7 +267,7 @@ class Bot(LoggingClass):
         else:
             self.command_matches_re = None
 
-    def get_commands_for_message(self, require_mention, can_mention, mention_rules, prefixes, prefix, msg):
+    def get_commands_for_message(self, require_mention, mention_rules, prefixes, prefix, msg):
         """
         Generator of all commands that a given message object triggers, based on
         the bots plugins and configuration.
@@ -285,7 +284,7 @@ class Bot(LoggingClass):
         """
         content = msg.content
 
-        if require_mention or can_mention:
+        if require_mention:
             mention_direct = msg.is_mentioned(self.client.state.me)
             mention_everyone = msg.mention_everyone
 
@@ -300,8 +299,7 @@ class Bot(LoggingClass):
                 mention_rules.get('role', False) and any(mention_roles),
                 msg.channel.is_dm
             )):
-                if require_mention and not can_mention:
-                    return []
+                return []
 
             if mention_direct:
                 if msg.guild:
@@ -321,20 +319,35 @@ class Bot(LoggingClass):
 
             content = content.lstrip()
 
-        prefixes.sort(key=len)
-        prefixes = [p.lower() for p in prefixes]
-        if prefixes and any(content.lower().startswith(p) for p in prefixes):
-            for prefix in prefixes:
-                if content.lower().startswith(prefix):
-                    content = content[len(prefix):]
-                    content = content.lstrip()
-                    break
-        else:
-            if prefix and not content.lower().startswith(prefix):
+        if prefixes:
+            content_lower = content.lower()
+            prefixes.sort(key=len)
+            try:
+                found = []
+                for p in prefixes:
+                    p = p.lower()
+                    if p == '<@id>':
+                        member = msg.guild.get_member(self.client.state.me)
+                        p = []
+                        if member.nick:
+                            p.append(member.mention)
+                        p.append(member.user.mention)
+                        p = [x for x in p if content_lower.startswith(x)]
+                        if not len(p):
+                            continue
+                        p = p[0]
+                    if content_lower.startswith(p):
+                        found.append(p)
+                        break
+                content = content[len(found[0]):].lstrip()
+            except IndexError:
                 return []
-            else:
-                content = content[len(prefix):]
-                content = content.lstrip()
+
+        if prefix and not content.startswith(prefix):
+            return []
+        else:
+            content = content[len(prefix):]
+            content = content.lstrip()
 
         if not self.command_matches_re or not self.command_matches_re.match(content):
             return []
@@ -389,7 +402,6 @@ class Bot(LoggingClass):
         """
         commands = list(self.get_commands_for_message(
             self.config.commands_require_mention,
-            self.config.commands_can_mention,
             self.config.commands_mention_rules,
             self.config.commands_prefixes,
             self.config.commands_prefix,
