@@ -323,13 +323,11 @@ class Bot(LoggingClass):
 
         prefixes.sort(key=len)
         if prefixes and any(content.startswith(p) for p in prefixes):
-            print(prefixes)
             for prefix in prefixes:
                 if content.startswith(prefix):
                     content = content[len(prefix):]
                     break
         else:
-            print('failed', prefixes)
             if prefix and not content.startswith(prefix):
                 return []
             else:
