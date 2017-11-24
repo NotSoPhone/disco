@@ -321,17 +321,19 @@ class Bot(LoggingClass):
 
         if prefixes:
             content_lower = content.lower()
-            prefixes.sort(key=len)
+            prefixes.sort(key=len, reverse=True)
             try:
                 found = []
                 for p in prefixes:
                     p = p.lower()
                     if p == '<@id>':
-                        member = msg.guild.get_member(self.client.state.me)
+                        user = self.client.state.me
                         p = []
-                        if member.nick:
-                            p.append(member.mention)
-                        p.append(member.user.mention)
+                        p.append(user.mention)
+                        if not msg.channel.is_dm:
+                            member = msg.guild.get_member(user)
+                            if member.nick:
+                                p.append(member.mention)
                         p = [x for x in p if content_lower.startswith(x)]
                         if not len(p):
                             continue
