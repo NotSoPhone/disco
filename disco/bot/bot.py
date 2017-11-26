@@ -43,10 +43,7 @@ class BotConfig(Config):
         a keys value is set to true, the mention type will be considered for
         command parsing.
     commands_prefix : str
-        A str prefix that is required for a message to be considered for
-        command parsing.
-    commands_prefixes : list
-        A list of prefixes that is required for a message to be considered for
+        A string prefix that is required for a message to be considered for
         command parsing.
     commands_allow_edit : bool
         If true, the bot will reparse an edited message if it was the last sent
@@ -89,7 +86,6 @@ class BotConfig(Config):
         'user': True,
     }
     commands_prefix = ''
-    commands_prefixes = []
     commands_allow_edit = True
     commands_level_getter = None
     commands_group_abbrev = True
@@ -221,7 +217,7 @@ class Bot(LoggingClass):
         Called when a plugin is loaded/unloaded to recompute internal state.
         """
         if self.config.commands_group_abbrev:
-            groups = set(command.group for command in self.commands if command.group)
+            groups = {command.group for command in self.commands if command.group}
             self.group_abbrev = self.compute_group_abbrev(groups)
 
         self.compute_command_matches_re()
@@ -267,7 +263,7 @@ class Bot(LoggingClass):
         else:
             self.command_matches_re = None
 
-    def get_commands_for_message(self, require_mention, mention_rules, prefixes, prefix, msg):
+    def get_commands_for_message(self, require_mention, mention_rules, prefix, msg):
         """
         Generator of all commands that a given message object triggers, based on
         the bots plugins and configuration.
@@ -297,7 +293,7 @@ class Bot(LoggingClass):
                 mention_rules.get('user', True) and mention_direct,
                 mention_rules.get('everyone', False) and mention_everyone,
                 mention_rules.get('role', False) and any(mention_roles),
-                msg.channel.is_dm
+                msg.channel.is_dm,
             )):
                 return []
 
@@ -319,37 +315,10 @@ class Bot(LoggingClass):
 
             content = content.lstrip()
 
-        if prefixes:
-            content_lower = content.lower()
-            prefixes.sort(key=len, reverse=True)
-            try:
-                found = []
-                for p in prefixes:
-                    p = p.lower()
-                    if p == '<@id>':
-                        user = self.client.state.me
-                        p = []
-                        p.append(user.mention)
-                        if not msg.channel.is_dm:
-                            member = msg.guild.get_member(user)
-                            if member.nick:
-                                p.append(member.mention)
-                        p = [x for x in p if content_lower.startswith(x)]
-                        if not len(p):
-                            continue
-                        p = p[0]
-                    if content_lower.startswith(p):
-                        found.append(p)
-                        break
-                content = content[len(found[0]):].lstrip()
-            except IndexError:
-                return []
-
         if prefix and not content.startswith(prefix):
             return []
         else:
             content = content[len(prefix):]
-            content = content.lstrip()
 
         if not self.command_matches_re or not self.command_matches_re.match(content):
             return []
@@ -405,9 +374,8 @@ class Bot(LoggingClass):
         commands = list(self.get_commands_for_message(
             self.config.commands_require_mention,
             self.config.commands_mention_rules,
-            self.config.commands_prefixes,
             self.config.commands_prefix,
-            msg
+            msg,
         ))
 
         if not len(commands):

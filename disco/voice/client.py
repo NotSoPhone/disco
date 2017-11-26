@@ -90,82 +90,78 @@ class UDPVoiceClient(LoggingClass):
 
     def run(self):
         while True:
-            try:
-                data, addr = self.conn.recvfrom(4096)
+            data, addr = self.conn.recvfrom(4096)
 
-                # Check the packet size
-                if len(data) < 13:
-                    raise ValueError('packet is too small: {}'.format(data))
+            # Check the packet size
+            if len(data) < 13:
+                raise ValueError('packet is too small: {}'.format(data))
 
-                # Unpack header
-                check, seq, ts, ssrc = struct.unpack_from(self._FORMAT, data)
-                header = data[:12]
-                buff = data[12:]
+            # Unpack header
+            check, seq, ts, ssrc = struct.unpack_from(self._FORMAT, data)
+            header = data[:12]
+            buff = data[12:]
 
-                # Check the packet is valid
-                if check != self._CHECK and check != self._CHECK2:
-                    fmt = 'packet has invalid check bytes: {}'
-                    raise ValueError(fmt.format(data))
+            # Check the packet is valid
+            if check != self._CHECK and check != self._CHECK2:
+                fmt = 'packet has invalid check bytes: {}'
+                raise ValueError(fmt.format(data))
 
-                # Decrypt data
-                nonce = bytearray(24)
-                nonce[:12] = header
-                buff = self.vc.secret_box.decrypt(bytes(buff), bytes(nonce))
+            # Decrypt data
+            nonce = bytearray(24)
+            nonce[:12] = header
+            buff = self.vc.secret_box.decrypt(bytes(buff), bytes(nonce))
 
-                if buff[0] == 0xBE and buff[1] == 0xDE:  # RFC5285 Section 4.2: One-Byte Header
-                    # Please note: This has been added to future-proof the code however I have been
-                    # unable to find any voice clients that are using the one-byte headers. As such,
-                    # this code is untested but should work.
-                    rtp_header_extension_length = buff[2] << 8 | buff[3]
-                    index = 4
-                    for i in range(rtp_header_extension_length):
-                        byte = buff[index]
-                        index += 1
-                        if byte == 0:
-                            continue
+            if buff[0] == 0xBE and buff[1] == 0xDE:  # RFC5285 Section 4.2: One-Byte Header
+                # Please note: This has been added to future-proof the code however I have been
+                # unable to find any voice clients that are using the one-byte headers. As such,
+                # this code is untested but should work.
+                rtp_header_extension_length = buff[2] << 8 | buff[3]
+                index = 4
+                for i in range(rtp_header_extension_length):
+                    byte = buff[index]
+                    index += 1
+                    if byte == 0:
+                        continue
 
-                        l = (byte & 0b1111) + 1
-                        index += l
+                    l = (byte & 0b1111) + 1
+                    index += l
 
-                    while buff[index] == 0:
-                        index += 1
+                while buff[index] == 0:
+                    index += 1
 
-                    buff = buff[index:]
-                elif check == self._CHECK2:
-                    # Packets starting with b'\x90' need the first 8 bytes ignored BecauseDiscord(tm)
-                    buff = buff[8:]
+                buff = buff[index:]
+            elif check == self._CHECK2:
+                # Packets starting with b'\x90' need the first 8 bytes ignored BecauseDiscord(tm)
+                buff = buff[8:]
 
-                if ssrc not in self._decoders:
-                    self._decoders[ssrc] = OpusDecoder(self.vc.sampling_rate, self.vc.channels)
+            if ssrc not in self._decoders:
+                self._decoders[ssrc] = OpusDecoder(self.vc.sampling_rate, self.vc.channels)
 
-                # Lookup the SSRC and then get the user
-                user_id = 0
-                member = None
+            # Lookup the SSRC and then get the user
+            user_id = 0
+            member = None
 
-                if ssrc in self.vc.ssrc_lookup:
-                    user_id = int(self.vc.ssrc_lookup[ssrc])
+            if ssrc in self.vc.ssrc_lookup:
+                user_id = int(self.vc.ssrc_lookup[ssrc])
 
-                    member = self.vc.channel.guild.get_member(user_id)
-                else:
-                    self.log.warning('User speaking was unknown! Dropping packet.')
-                    continue
+                member = self.vc.channel.guild.get_member(user_id)
+            else:
+                self.log.warning('User speaking was unknown! Dropping packet.')
+                return
 
-                buff = self._decoders[ssrc].decode(buff)
+            buff = self._decoders[ssrc].decode(buff)
 
-                obj = VoiceReceived()
-                obj.member = member
-                obj.channel = self.vc.channel
-                obj.voice_data = buff
-                obj.timestamp = ts
-                obj.sequence = seq
+            obj = VoiceReceived()
+            obj.member = member
+            obj.channel = self.vc.channel
+            obj.voice_data = buff
+            obj.timestamp = ts
+            obj.sequence = seq
 
-                self.vc.client.gw.events.emit('VoiceReceived', obj)
+            self.vc.client.gw.events.emit('VoiceReceived', obj)
 
-                for cb in self.vc.pcm_listeners:
-                    cb(obj)
-            except Exception as e:
-                print('Exception!!', e)
-
+            for cb in self.vc.pcm_listeners:
+                cb(obj)
 
     def send(self, data):
         self.conn.sendto(data, (self.ip, self.port))
@@ -216,14 +212,14 @@ class VoiceClient(LoggingClass):
         self.encoder = encoder or JSONEncoder
 
         # Bind to some WS packets
-        self.packets = Emitter(gevent.spawn)
+        self.packets = Emitter(spawn_each=True)
         self.packets.on(VoiceOPCode.READY, self.on_voice_ready)
         self.packets.on(VoiceOPCode.SESSION_DESCRIPTION, self.on_voice_sdp)
         self.packets.on(VoiceOPCode.SPEAKING, self.on_voice_speaking)
 
         # State + state change emitter
         self.state = VoiceState.DISCONNECTED
-        self.state_emitter = Emitter(gevent.spawn)
+        self.state_emitter = Emitter(spawn_each=True)
 
         # Connection metadata
         self.token = None
@@ -274,9 +270,12 @@ class VoiceClient(LoggingClass):
             'd': data,
         }), self.encoder.OPCODE)
 
-    def pipe_voice_into_file(self, member, file_object, buffer_size=0.2, SAMPLE_RATE=48000, SAMPLE_SIZE=2):
+    def pipe_voice_into_file(self, member, file_object, buffer_size=0.2):
         # Convert buffer_size from seconds to packets.
         buffer_size = int(round((buffer_size * 1000) / 20))
+
+        SAMPLE_RATE = 48000
+        SAMPLE_SIZE = 2
 
         user_id = member.id
 
@@ -357,8 +356,8 @@ class VoiceClient(LoggingClass):
             'data': {
                 'port': port,
                 'address': ip,
-                'mode': 'xsalsa20_poly1305'
-            }
+                'mode': 'xsalsa20_poly1305',
+            },
         })
 
     def on_voice_sdp(self, sdp):
@@ -397,7 +396,7 @@ class VoiceClient(LoggingClass):
         try:
             data = self.encoder.decode(msg)
             self.packets.emit(VoiceOPCode[data['op']], data['d'])
-        except:
+        except Exception:
             self.log.exception('Failed to parse voice gateway message: ')
 
     def on_error(self, err):
@@ -408,7 +407,7 @@ class VoiceClient(LoggingClass):
             'server_id': self.channel.guild_id,
             'user_id': self.client.state.me.id,
             'session_id': self.client.gw.session_id,
-            'token': self.token
+            'token': self.token,
         })
 
     def on_close(self, code, error):
