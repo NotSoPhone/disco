@@ -16,7 +16,7 @@ class Player(object):
         'STOP_PLAY',
         'PAUSE_PLAY',
         'RESUME_PLAY',
-        'DISCONNECT',
+        'DISCONNECT'
     )
 
     def __init__(self, client, queue=None):
@@ -44,7 +44,7 @@ class Player(object):
         self.complete = gevent.event.Event()
 
         # Event emitter for metadata
-        self.events = Emitter(spawn_each=True)
+        self.events = Emitter(gevent.spawn)
 
     def disconnect(self):
         self.client.disconnect()
