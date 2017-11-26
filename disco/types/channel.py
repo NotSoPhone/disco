@@ -24,7 +24,7 @@ ChannelType = Enum(
 
 PermissionOverwriteType = Enum(
     ROLE='role',
-    MEMBER='member',
+    MEMBER='member'
 )
 
 
@@ -69,7 +69,7 @@ class PermissionOverwrite(ChannelSubType):
             type=ptype,
             allow=allow,
             deny=deny,
-            channel_id=channel.id,
+            channel_id=channel.id
         ).save()
 
     @property
@@ -139,7 +139,7 @@ class Channel(SlottedModel, Permissible):
         self.attach(six.itervalues(self.overwrites), {'channel_id': self.id, 'channel': self})
 
     def __str__(self):
-        return u'#{}'.format(self.name) if self.name else six.text_type(self.id)
+        return u'#{}'.format(self.name)
 
     def __repr__(self):
         return u'<Channel {} ({})>'.format(self.id, self)
@@ -441,34 +441,6 @@ class Channel(SlottedModel, Permissible):
             parent_id=to_snowflake(parent) if parent else parent,
             reason=reason)
 
-    def create_text_channel(self, *args, **kwargs):
-        """
-        Creates a sub-text-channel in this category. See `Guild.create_text_channel`
-        for arguments and more information.
-        """
-        if self.type != ChannelType.GUILD_CATEGORY:
-            raise ValueError('Cannot create a sub-channel on a non-category channel')
-
-        kwargs['parent_id'] = self.id
-        return self.guild.create_text_channel(
-            *args,
-            **kwargs
-        )
-
-    def create_voice_channel(self, *args, **kwargs):
-        """
-        Creates a sub-voice-channel in this category. See `Guild.create_voice_channel`
-        for arguments and more information.
-        """
-        if self.type != ChannelType.GUILD_CATEGORY:
-            raise ValueError('Cannot create a sub-channel on a non-category channel')
-
-        kwargs['parent_id'] = self.id
-        return self.guild.create_voice_channel(
-            *args,
-            **kwargs
-        )
-
 
 class MessageIterator(object):
     """
@@ -506,7 +478,7 @@ class MessageIterator(object):
         self.last = None
         self._buffer = []
 
-        if before is None and after is None and self.direction == self.Direction.DOWN:
+        if not any((before, after)) and self.direction == self.Direction.DOWN:
             raise Exception('Must specify either before or after for downward seeking')
 
     def fill(self):

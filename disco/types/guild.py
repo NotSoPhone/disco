@@ -1,5 +1,4 @@
 import six
-import warnings
 
 from holster.enum import Enum
 
@@ -9,11 +8,11 @@ from disco.util.paginator import Paginator
 from disco.util.snowflake import to_snowflake
 from disco.types.base import (
     SlottedModel, Field, ListField, AutoDictField, DictField, snowflake, text, enum, datetime,
-    cached_property,
+    cached_property
 )
 from disco.types.user import User
 from disco.types.voice import VoiceState
-from disco.types.channel import Channel, ChannelType
+from disco.types.channel import Channel
 from disco.types.message import Emoji
 from disco.types.permissions import PermissionValue, Permissions, Permissible
 
@@ -29,7 +28,7 @@ VerificationLevel = Enum(
 ExplicitContentFilterLevel = Enum(
     NONE=0,
     WITHOUT_ROLES=1,
-    ALL=2,
+    ALL=2
 )
 
 DefaultMessageNotificationsLevel = Enum(
@@ -441,53 +440,7 @@ class Guild(SlottedModel, Permissible):
         self.client.api.guilds_bans_create(self.id, to_snowflake(user), *args, **kwargs)
 
     def create_channel(self, *args, **kwargs):
-        warnings.warn(
-            'Guild.create_channel will be deprecated soon, please use:'
-            ' Guild.create_text_channel or Guild.create_category or Guild.create_voice_channel',
-            DeprecationWarning)
-
         return self.client.api.guilds_channels_create(self.id, *args, **kwargs)
-
-    def create_category(self, name, permission_overwrites=[], position=None, reason=None):
-        """
-        Creates a category within the guild.
-        """
-        return self.client.api.guilds_channels_create(
-            self.id, ChannelType.GUILD_CATEGORY, name=name, permission_overwrites=permission_overwrites,
-            position=position, reason=reason,
-        )
-
-    def create_text_channel(
-            self,
-            name,
-            permission_overwrites=[],
-            parent_id=None,
-            nsfw=None,
-            position=None,
-            reason=None):
-        """
-        Creates a text channel within the guild.
-        """
-        return self.client.api.guilds_channels_create(
-            self.id, ChannelType.GUILD_TEXT, name=name, permission_overwrites=permission_overwrites,
-            parent_id=parent_id, nsfw=nsfw, position=position, reason=reason,
-        )
-
-    def create_voice_channel(
-            self,
-            name,
-            permission_overwrites=[],
-            parent_id=None,
-            bitrate=None,
-            user_limit=None,
-            position=None,
-            reason=None):
-        """
-        Creates a voice channel within the guild.
-        """
-        return self.client.api.guilds_channels_create(
-            self.id, ChannelType.GUILD_VOICE, name=name, permission_overwrites=permission_overwrites,
-            parent_id=parent_id, bitrate=bitrate, user_limit=user_limit, position=position, reason=None)
 
     def leave(self):
         return self.client.api.users_me_guilds_delete(self.id)

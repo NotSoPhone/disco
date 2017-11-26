@@ -8,7 +8,7 @@ from holster.enum import Enum
 
 from disco.types.base import (
     SlottedModel, Field, ListField, AutoDictField, snowflake, text,
-    datetime, enum, cached_property,
+    datetime, enum, cached_property
 )
 from disco.util.paginator import Paginator
 from disco.util.snowflake import to_snowflake
@@ -43,7 +43,7 @@ class Emoji(SlottedModel):
 
     @cached_property
     def custom(self):
-        return bool(self.id)
+        return self.id is not None
 
     def __eq__(self, other):
         if isinstance(other, Emoji):
@@ -177,7 +177,7 @@ class MessageEmbedAuthor(SlottedModel):
     name = Field(text)
     url = Field(text)
     icon_url = Field(text)
-    proxy_icon_url = Field(text)
+    icon_proxy_url = Field(text)
 
 
 class MessageEmbedField(SlottedModel):
